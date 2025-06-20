@@ -112,11 +112,13 @@ if data_loaded_successfully:
 
             st.header("2. Seleccionar Periodos de Comparación")
             available_periods = patient_records['Periodo'].unique().tolist()
+            
+            # *** CAMBIO: Se invierte el orden de los selectores de fecha ***
             col1, col2 = st.columns(2)
             with col1:
-                fecha_comparativa = st.selectbox("Fecha Comparativa (punto de partida)", options=available_periods, index=None, placeholder="Elige una fecha")
-            with col2:
                 fecha_evolutiva = st.selectbox("Fecha Evolutiva (reciente)", options=available_periods, index=None, placeholder="Elige una fecha")
+            with col2:
+                fecha_comparativa = st.selectbox("Fecha Comparativa (punto de partida)", options=available_periods, index=None, placeholder="Elige una fecha")
             
             st.header("3. Ejecutar Análisis")
             if st.button("Analizar Progreso", disabled=not (fecha_comparativa and fecha_evolutiva)):
@@ -131,11 +133,11 @@ if data_loaded_successfully:
                     url_comp = record_comp.get('URL_PDF', '#')
                     url_evol = record_evol.get('URL_PDF', '#')
                     
-                    st.write(f"Comparando la valoración de **{fecha_comparativa}** ([ver PDF]({url_comp})) con la de **{fecha_evolutiva}** ([ver PDF]({url_evol})).")
+                    st.write(f"Comparando la valoración de **{fecha_evolutiva}** ([ver PDF]({url_evol})) con la de **{fecha_comparativa}** ([ver PDF]({url_comp})).")
                     
                     resultados = []
                     
-                    # *** CAMBIO: Se define un orden fijo y específico para las etiquetas en la tabla ***
+                    # Se define el orden fijo y específico para las etiquetas en la tabla
                     orden_columnas_deseado = [
                         'Realiza levantamiento de pelota de 1.5 kg',
                         'Realiza levantamiento de pelota de 2.0 kg',
@@ -171,36 +173,43 @@ if data_loaded_successfully:
                         'Busca estrategias para dar solucion a problemas motores.'
                     ]
 
-                    # Se itera sobre la lista ordenada para construir la tabla en esa secuencia
-                    for col in orden_columnas_deseado:
-                        # Se asegura de que la columna exista en los datos antes de procesarla
-                        if col in record_comp and col in record_evol:
-                            val_comp = record_comp.get(col)
-                            val_evol = record_evol.get(col)
-                            
-                            display_comp = "N/A" if pd.isna(val_comp) else int(val_comp)
-                            display_evol = "N/A" if pd.isna(val_evol) else int(val_evol)
+                    columnas_analisis = [col for col in orden_columnas_deseado if col in df.columns]
 
-                            diferencia = "N/A"
-                            if pd.notna(val_comp) and pd.notna(val_evol):
-                                try:
-                                    diferencia = int(val_evol) - int(val_comp)
-                                except (ValueError, TypeError):
-                                    diferencia = "Error"
-                            
-                            analisis = get_analysis_description(diferencia)
-                            
-                            resultados.append({
-                                "Etiqueta": col,
-                                f"Valor ({fecha_comparativa})": display_comp,
-                                f"Valor ({fecha_evolutiva})": display_evol,
-                                "% Diff.": diferencia,
-                                "Análisis": analisis
-                            })
+                    for col in columnas_analisis:
+                        val_comp = record_comp.get(col)
+                        val_evol = record_evol.get(col)
+                        
+                        display_comp = "N/A" if pd.isna(val_comp) else int(val_comp)
+                        display_evol = "N/A" if pd.isna(val_evol) else int(val_evol)
+
+                        diferencia = "N/A"
+                        if pd.notna(val_comp) and pd.notna(val_evol):
+                            try:
+                                diferencia = int(val_evol) - int(val_comp)
+                            except (ValueError, TypeError):
+                                diferencia = "Error"
+                        
+                        analisis = get_analysis_description(diferencia)
+                        
+                        # Los nombres de las columnas en la tabla reflejan el nuevo orden
+                        resultados.append({
+                            "Etiqueta": col,
+                            f"Valor ({fecha_evolutiva})": display_evol,
+                            f"Valor ({fecha_comparativa})": display_comp,
+                            "% Diff.": diferencia,
+                            "Análisis": analisis
+                        })
                     
                     if resultados:
                         df_resultados = pd.DataFrame(resultados).set_index("Etiqueta")
-                        st.table(df_resultados)
+                        # Reordenar las columnas de la tabla final para que coincida con la lógica
+                        columnas_tabla_final = [
+                            f"Valor ({fecha_evolutiva})",
+                            f"Valor ({fecha_comparativa})",
+                            "% Diff.",
+                            "Análisis"
+                        ]
+                        st.table(df_resultados[columnas_tabla_final])
     else:
         pass
 else:
