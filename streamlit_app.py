@@ -135,10 +135,8 @@ if data_loaded_successfully:
                     
                     resultados = []
                     
-                    # *** CAMBIO: Se define un orden lógico para las columnas de análisis ***
+                    # *** CAMBIO: Se define un orden fijo y específico para las etiquetas en la tabla ***
                     orden_columnas_deseado = [
-                        'Presenta adecuada coordinacion visomanual',
-                        'Presenta adecuada coordinacion visopedica',
                         'Realiza levantamiento de pelota de 1.5 kg',
                         'Realiza levantamiento de pelota de 2.0 kg',
                         'Realiza levantamiento de pelota de 3.0 kg',
@@ -146,6 +144,8 @@ if data_loaded_successfully:
                         'Levanta y mantiene por 10 segundos.',
                         'Levanta y mantiene por mas de 10 segundos',
                         'Levanta, mantiene y se desplaza.',
+                        'Presenta adecuada coordinacion visomanual',
+                        'Presenta adecuada coordinacion visopedica',
                         'Realiza traslado sobre barra de equilibrio',
                         'Se sostiene en balancin en un solo pie',
                         'Se sostiene en balancin con 2 pies por 10 segundos',
@@ -171,36 +171,37 @@ if data_loaded_successfully:
                         'Busca estrategias para dar solucion a problemas motores.'
                     ]
 
-                    # Filtramos la lista para incluir solo las columnas que existen en el DataFrame
-                    columnas_analisis = [col for col in orden_columnas_deseado if col in df.columns]
+                    # Se itera sobre la lista ordenada para construir la tabla en esa secuencia
+                    for col in orden_columnas_deseado:
+                        # Se asegura de que la columna exista en los datos antes de procesarla
+                        if col in record_comp and col in record_evol:
+                            val_comp = record_comp.get(col)
+                            val_evol = record_evol.get(col)
+                            
+                            display_comp = "N/A" if pd.isna(val_comp) else int(val_comp)
+                            display_evol = "N/A" if pd.isna(val_evol) else int(val_evol)
 
-                    for col in columnas_analisis:
-                        val_comp = record_comp.get(col)
-                        val_evol = record_evol.get(col)
-                        
-                        display_comp = "N/A" if pd.isna(val_comp) else int(val_comp)
-                        display_evol = "N/A" if pd.isna(val_evol) else int(val_evol)
-
-                        diferencia = "N/A"
-                        if pd.notna(val_comp) and pd.notna(val_evol):
-                            try:
-                                diferencia = int(val_evol) - int(val_comp)
-                            except (ValueError, TypeError):
-                                diferencia = "Error"
-                        
-                        analisis = get_analysis_description(diferencia)
-                        
-                        resultados.append({
-                            "Etiqueta": col,
-                            f"Valor ({fecha_comparativa})": display_comp,
-                            f"Valor ({fecha_evolutiva})": display_evol,
-                            "% Diff.": diferencia,
-                            "Análisis": analisis
-                        })
+                            diferencia = "N/A"
+                            if pd.notna(val_comp) and pd.notna(val_evol):
+                                try:
+                                    diferencia = int(val_evol) - int(val_comp)
+                                except (ValueError, TypeError):
+                                    diferencia = "Error"
+                            
+                            analisis = get_analysis_description(diferencia)
+                            
+                            resultados.append({
+                                "Etiqueta": col,
+                                f"Valor ({fecha_comparativa})": display_comp,
+                                f"Valor ({fecha_evolutiva})": display_evol,
+                                "% Diff.": diferencia,
+                                "Análisis": analisis
+                            })
                     
-                    df_resultados = pd.DataFrame(resultados).set_index("Etiqueta")
-                    
-                    st.table(df_resultados)
+                    if resultados:
+                        df_resultados = pd.DataFrame(resultados).set_index("Etiqueta")
+                        st.table(df_resultados)
     else:
         pass
-el
+else:
+    st.info("La aplicación no puede cargar los datos. Por favor, contacta al administrador.")
