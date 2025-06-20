@@ -134,7 +134,45 @@ if data_loaded_successfully:
                     st.write(f"Comparando la valoración de **{fecha_comparativa}** ([ver PDF]({url_comp})) con la de **{fecha_evolutiva}** ([ver PDF]({url_evol})).")
                     
                     resultados = []
-                    columnas_analisis = [col for col in df.columns if col not in ['Nombre Archivo', 'Nombre Paciente', 'Identificación', 'Periodo', 'URL_PDF']]
+                    
+                    # *** CAMBIO: Se define un orden lógico para las columnas de análisis ***
+                    orden_columnas_deseado = [
+                        'Presenta adecuada coordinacion visomanual',
+                        'Presenta adecuada coordinacion visopedica',
+                        'Realiza levantamiento de pelota de 1.5 kg',
+                        'Realiza levantamiento de pelota de 2.0 kg',
+                        'Realiza levantamiento de pelota de 3.0 kg',
+                        'Realiza levantamiento de mas de 3.0 kg',
+                        'Levanta y mantiene por 10 segundos.',
+                        'Levanta y mantiene por mas de 10 segundos',
+                        'Levanta, mantiene y se desplaza.',
+                        'Realiza traslado sobre barra de equilibrio',
+                        'Se sostiene en balancin en un solo pie',
+                        'Se sostiene en balancin con 2 pies por 10 segundos',
+                        'Se sostiene en balancin con 2 pies por 20 segundos.',
+                        'Se sostiene en balancin con 2 pies por 30 segundos.',
+                        'Salto en dos pies.',
+                        'Salto en un pie.',
+                        'Realiza arrastre.',
+                        'Realiza rollos.',
+                        'Realiza rolados.',
+                        'Realiza carrera.',
+                        'Trepa.',
+                        'Lanza pelota con ambas manos.',
+                        'Lanza pelota con la mano derecha',
+                        'Lanza pelota con la mano izquierda.',
+                        'Atrapa pelotas.',
+                        'Empuja.',
+                        'Patea.',
+                        'Hala.',
+                        'Alcanza.',
+                        'Levanta desde el piso.',
+                        'Planea, inicia y ejecuta actividades motoras.',
+                        'Busca estrategias para dar solucion a problemas motores.'
+                    ]
+
+                    # Filtramos la lista para incluir solo las columnas que existen en el DataFrame
+                    columnas_analisis = [col for col in orden_columnas_deseado if col in df.columns]
 
                     for col in columnas_analisis:
                         val_comp = record_comp.get(col)
@@ -162,10 +200,7 @@ if data_loaded_successfully:
                     
                     df_resultados = pd.DataFrame(resultados).set_index("Etiqueta")
                     
-                    # Se usa st.table() para una tabla estática y sin scroll.
-                    # Nota: st.table no soporta el coloreado de celdas.
                     st.table(df_resultados)
     else:
         pass
-else:
-    st.info("La aplicación no puede cargar los datos. Por favor, contacta al administrador.")
+el
