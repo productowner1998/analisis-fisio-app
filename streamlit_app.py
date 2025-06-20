@@ -11,6 +11,40 @@ st.set_page_config(
     layout="wide"
 )
 
+# --- DICCIONARIO DE DESCRIPCIONES ---
+# Este diccionario mapea la escala de progreso a las descripciones clínicas
+PROGRESS_DESCRIPTIONS = {
+    "N/A": "No aplica. El paciente no fue evaluado por razones clínicas o porque ese ítem no está siendo trabajado.",
+    0: "No presenta aumento. No se ha observado progreso en ese aspecto evaluado.",
+    1: "Mejora ligera, posiblemente inicial o marginal. (Aumento de 11 pts)",
+    2: "Progreso clínicamente moderado. (Aumento de 22 pts)",
+    3: "Progreso consistente y significativo. (Aumento de 33 pts)",
+    4: "Progreso importante. (Aumento de 44 pts)",
+    5: "Mejora significativa, cercana a la mitad del máximo esperado. (Aumento de 55 pts)",
+    6: "Mejora clara y continua. (Aumento de 66 pts)",
+    7: "Progreso muy destacado. (Aumento de 77 pts)",
+    8: "Gran mejora, resultado clínicamente excelente. (Aumento de 88 pts)",
+    "NEGATIVO": "Regresión. Se ha observado un retroceso en este ítem."
+}
+
+def get_progress_description(difference):
+    """
+    Asigna una descripción clínica basada en la diferencia numérica.
+    """
+    if difference == "N/A" or difference == "Error":
+        return PROGRESS_DESCRIPTIONS["N/A"]
+    
+    diff_val = float(difference)
+    
+    if diff_val == 0:
+        return PROGRESS_DESCRIPTIONS[0]
+    elif diff_val < 0:
+        return PROGRESS_DESCRIPTIONS["NEGATIVO"]
+    else:
+        # Escalar la diferencia (ej. 22 -> 2.0) y buscar la descripción
+        scaled_diff = round(diff_val / 11)
+        return PROGRESS_DESCRIPTIONS.get(scaled_diff, "Progreso positivo no categorizado.")
+
 # --- CONEXIÓN A GOOGLE SHEETS Y CARGA DE DATOS ---
 try:
     credentials_dict = st.secrets["gcp_service_account"]
@@ -18,26 +52,22 @@ try:
     creds = ServiceAccountCredentials.from_json_keyfile_dict(credentials_dict, scope)
     client = gspread.authorize(creds)
     
-    # Reemplaza con el nombre exacto de tu hoja de cálculo
     SPREADSHEET_NAME = "Resultados Informes Fisioterapia" 
     sheet = client.open(SPREADSHEET_NAME).sheet1
     
-    @st.cache_data(ttl=600) # Cache por 10 minutos
+    @st.cache_data(ttl=600)
     def load_data():
         data = sheet.get_all_records()
         df = pd.DataFrame(data)
         
-        # Función para extraer el nombre limpio del hipervínculo
         def extract_name_from_hyperlink(formula):
             if isinstance(formula, str):
                 match = re.search(r'";"([^"]+)"\)', formula)
                 return match.group(1) if match else formula
             return formula
 
-        # Aplicar la extracción del nombre
         df['Nombre Limpio'] = df['Nombre Paciente'].apply(extract_name_from_hyperlink)
         
-        # Convertir columnas numéricas
         columnas_datos = [col for col in df.columns if col not in ['Nombre Archivo', 'Nombre Paciente', 'Identificación', 'Periodo', 'Nombre Limpio']]
         for col in columnas_datos:
              df[col] = pd.to_numeric(df[col], errors='coerce').fillna('N/A')
@@ -57,18 +87,11 @@ st.write("Esta aplicación te permite comparar dos valoraciones de un paciente p
 
 if data_loaded_successfully:
     
-    # --- PREPARACIÓN PARA EL SELECTOR DE PACIENTES ---
-    # Crear una lista de pacientes únicos para el dropdown
     unique_patients_df = df[['Nombre Limpio', 'Identificación']].drop_duplicates()
-    # Crear la etiqueta que se mostrará en el dropdown: "Nombre (ID)"
     unique_patients_df['display_label'] = unique_patients_df['Nombre Limpio'] + " (" + unique_patients_df['Identificación'].astype(str) + ")"
-    
     patient_options = unique_patients_df['display_label'].tolist()
     
-    # --- 1. BÚSQUEDA DE PACIENTE MEJORADA ---
     st.header("1. Seleccionar Paciente")
-    
-    # Usamos st.selectbox que tiene búsqueda integrada
     selected_patient_label = st.selectbox(
         "Escribe un nombre o identificación para buscar y seleccionar un paciente:",
         options=patient_options,
@@ -77,18 +100,13 @@ if data_loaded_successfully:
     )
 
     if selected_patient_label:
-        # Obtener el ID del paciente seleccionado
         selected_id = unique_patients_df[unique_patients_df['display_label'] == selected_patient_label]['Identificación'].iloc[0]
-        
-        # Filtrar todos los registros del paciente seleccionado
         patient_records = df[df['Identificación'] == selected_id]
         patient_name = unique_patients_df[unique_patients_df['display_label'] == selected_patient_label]['Nombre Limpio'].iloc[0]
         
         st.success(f"Paciente seleccionado: **{patient_name}**")
 
-        # --- 2. SELECCIÓN DE FECHAS ---
         st.header("2. Seleccionar Periodos de Comparación")
-        
         available_periods = patient_records['Periodo'].unique().tolist()
 
         col1, col2 = st.columns(2)
@@ -97,10 +115,7 @@ if data_loaded_successfully:
         with col2:
             fecha_evolutiva = st.selectbox("Fecha Evolutiva (reciente)", options=available_periods, index=None, placeholder="Elige una fecha")
         
-        # --- 3. ANÁLISIS ---
         st.header("3. Ejecutar Análisis")
-
-        # El botón está deshabilitado si no se han seleccionado ambas fechas
         if st.button("Analizar Progreso", disabled=not (fecha_comparativa and fecha_evolutiva)):
             if fecha_comparativa == fecha_evolutiva:
                 st.warning("Por favor, selecciona dos fechas diferentes para la comparación.")
@@ -133,14 +148,18 @@ if data_loaded_successfully:
                         except (ValueError, TypeError):
                             diferencia = "Error"
                     
+                    descripcion = get_progress_description(diferencia)
+                    
                     resultados.append({
                         "Etiqueta": col,
                         f"Valor ({fecha_comparativa})": val_comp,
                         f"Valor ({fecha_evolutiva})": val_evol,
-                        "Diferencia (Evolutiva - Comparativa)": diferencia
+                        "Diferencia (Evolutiva - Comparativa)": diferencia,
+                        "Descripción": descripcion
                     })
                 
                 df_resultados = pd.DataFrame(resultados)
-                st.dataframe(df_resultados)
+                # Usamos st.table para mostrar la tabla completa sin scrollbars internos
+                st.table(df_resultados.set_index("Etiqueta"))
 else:
     st.info("La aplicación no puede cargar los datos. Por favor, contacta al administrador.")
