@@ -39,7 +39,49 @@ def format_difference(val):
         # Formatea como entero sin decimales
         return f"{int(val):d}"
     except (ValueError, TypeError):
-        return '' # Devuelve vacío si no se puede convertir (no debería pasar)
+        return '' # Devuelve vacío si no se puede convertir
+
+# --- FUNCIÓN PARA OBTENER EL ANÁLISIS CLÍNICO ---
+def get_analysis_description(difference):
+    """
+    Asigna una descripción clínica basada en la diferencia numérica.
+    """
+    if difference == "N/A" or difference == "Error":
+        return "No aplica. El paciente no fue evaluado por razones clínicas o porque ese ítem no está siendo trabajado."
+
+    try:
+        diff_val = float(difference)
+    except (ValueError, TypeError):
+        return "No se pudo interpretar la diferencia."
+
+    if diff_val < 0:
+        return "No presenta aumento. El paciente no fue evaluado por razones clínicas o porque ese ítem no está siendo trabajado."
+    if diff_val == 0:
+        return "No presenta aumento. No se ha observado progreso en ese aspecto evaluado."
+
+    # Mapeo de rangos de diferencia a descripciones
+    if 0.5 <= diff_val <= 5.9: return "Leve mejoría, apenas perceptible."
+    if 6 <= diff_val <= 10.9: return "Mejora ligera, posiblemente inicial o marginal."
+    if 11 <= diff_val <= 15.9: return "Mejora leve pero ya observable."
+    if 16 <= diff_val <= 20.9: return "Progreso clínicamente moderado."
+    if 21 <= diff_val <= 25.9: return "Mejora establecida, aunque todavía moderada."
+    if 26 <= diff_val <= 30.9: return "Progreso consistente y significativo."
+    if 31 <= diff_val <= 35.9: return "Mejora marcada, buen avance terapéutico."
+    if 36 <= diff_val <= 40.9: return "Progreso importante."
+    if 41 <= diff_val <= 45.9: return "Avance clínicamente sólido."
+    if 46 <= diff_val <= 50.9: return "Mejora significativa, cercana a la mitad del máximo esperado."
+    if 51 <= diff_val <= 55.9: return "Ya se supera la mitad del potencial de mejora."
+    if 56 <= diff_val <= 60.9: return "Mejora clara y continua."
+    if 61 <= diff_val <= 65.9: return "Alto nivel de progreso."
+    if 66 <= diff_val <= 70.9: return "Progreso muy destacado."
+    if 71 <= diff_val <= 75.9: return "El paciente se acerca al máximo de mejora posible."
+    if 76 <= diff_val <= 80.9: return "Gran mejora, resultado clínicamente excelente."
+    if 81 <= diff_val <= 85.9: return "Alta recuperación o efectividad del tratamiento."
+    if 86 <= diff_val <= 90.9: return "Nivel casi óptimo."
+    if 91 <= diff_val <= 95.9: return "Progreso casi completo."
+    if 96 <= diff_val <= 100: return "Mejora máxima alcanzada según los ítems evaluados."
+    
+    return "Progreso positivo no categorizado."
 
 # --- CONEXIÓN A GOOGLE SHEETS Y CARGA DE DATOS ---
 try:
@@ -147,17 +189,20 @@ if data_loaded_successfully:
                             except (ValueError, TypeError):
                                 diferencia = "Error"
                         
+                        # Obtener la descripción del análisis
+                        analisis = get_analysis_description(diferencia)
+
                         resultados.append({
                             "Etiqueta": col,
                             f"Valor ({fecha_comparativa})": display_comp,
                             f"Valor ({fecha_evolutiva})": display_evol,
-                            "Diferencia (Evolutiva - Comparativa)": diferencia
+                            "Diferencia (Evolutiva - Comparativa)": diferencia,
+                            "Análisis": analisis
                         })
                     
                     df_resultados = pd.DataFrame(resultados).set_index("Etiqueta")
                     
-                    # Se usa st.table para una tabla estática y no desplazable.
-                    # El estilo se aplica después de crear el DataFrame.
+                    # Usar st.table para una tabla estática y no desplazable.
                     st.table(df_resultados.style.format(
                         formatter={"Diferencia (Evolutiva - Comparativa)": format_difference}
                     ).apply(
