@@ -99,7 +99,6 @@ try:
             return pd.DataFrame()
         df = pd.DataFrame(data)
         df['Identificación'] = df['Identificación'].astype(str).str.strip()
-        # *** CAMBIO: Se añade 'URL_PDF' a la lista de columnas a no convertir ***
         columnas_datos = [col for col in df.columns if col not in ['Nombre Archivo', 'Nombre Paciente', 'Identificación', 'Periodo', 'URL_PDF']]
         for col in columnas_datos:
              numeric_col = pd.to_numeric(df[col], errors='coerce')
@@ -157,17 +156,14 @@ if data_loaded_successfully:
                     record_comp = patient_records[patient_records['Periodo'] == fecha_comparativa].iloc[0]
                     record_evol = patient_records[patient_records['Periodo'] == fecha_evolutiva].iloc[0]
 
-                    # --- LÓGICA SIN MODAL ---
                     st.subheader("Resultados del Análisis")
                     
-                    # *** CAMBIO: Se obtienen las URLs de la nueva columna ***
                     url_comp = record_comp.get('URL_PDF', '#')
                     url_evol = record_evol.get('URL_PDF', '#')
                     
                     st.write(f"Comparando la valoración de **{fecha_comparativa}** ([ver PDF]({url_comp})) con la de **{fecha_evolutiva}** ([ver PDF]({url_evol})).")
                     
                     resultados = []
-                    # *** CAMBIO: Se excluye 'URL_PDF' del análisis de etiquetas ***
                     columnas_analisis = [col for col in df.columns if col not in ['Nombre Archivo', 'Nombre Paciente', 'Identificación', 'Periodo', 'URL_PDF']]
 
                     for col in columnas_analisis:
@@ -196,11 +192,17 @@ if data_loaded_successfully:
                     
                     df_resultados = pd.DataFrame(resultados).set_index("Etiqueta")
                     
-                    st.table(df_resultados.style.format(
-                        formatter={"Diferencia": format_difference}
-                    ).apply(
-                        lambda x: x.map(style_difference), subset=['Diferencia']
-                    ))
+                    # *** CAMBIO: Se usa st.dataframe con configuración de columnas para un mejor layout ***
+                    st.dataframe(
+                        df_resultados.style.format(formatter={"Diferencia": format_difference}).apply(lambda x: x.map(style_difference), subset=['Diferencia']),
+                        column_config={
+                            f"Valor ({fecha_comparativa})": st.column_config.TextColumn(width="small"),
+                            f"Valor ({fecha_evolutiva})": st.column_config.TextColumn(width="small"),
+                            "Diferencia": st.column_config.TextColumn(width="small"),
+                            "Análisis": st.column_config.TextColumn(width="large"),
+                        },
+                        use_container_width=True
+                    )
     else:
         pass
 else:
