@@ -14,16 +14,16 @@ st.set_page_config(
 # --- FUNCIÓN PARA APLICAR ESTILO DE COLOR ---
 def style_difference(val):
     """
-    Aplica un color sutil a los valores de diferencia.
+    Aplica color a los valores de diferencia.
     Verde para positivo, Rojo para negativo. 0 y N/A se ignoran.
     """
     color = 'inherit' # Color por defecto
     try:
         val_float = float(val)
         if val_float > 0:
-            color = '#28a745'  # Verde sutil
+            color = 'green'
         elif val_float < 0:
-            color = '#dc3545'  # Rojo sutil
+            color = 'red'
     except (ValueError, TypeError):
         pass # Se mantiene el color por defecto para 'N/A' o 'Error'
     return f'color: {color}'
@@ -156,9 +156,9 @@ if data_loaded_successfully:
                     
                     df_resultados = pd.DataFrame(resultados).set_index("Etiqueta")
                     
-                    # *** LÍNEA CORREGIDA ***
-                    # Se usa un formateador personalizado para asegurar que el 0 se muestre.
-                    st.dataframe(df_resultados.style.format(
+                    # Se usa st.table para una tabla estática y no desplazable.
+                    # El estilo se aplica después de crear el DataFrame.
+                    st.table(df_resultados.style.format(
                         formatter={"Diferencia (Evolutiva - Comparativa)": format_difference}
                     ).apply(
                         lambda x: x.map(style_difference), subset=['Diferencia (Evolutiva - Comparativa)']
