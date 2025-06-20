@@ -53,7 +53,8 @@ try:
         # Función robusta para extraer el nombre limpio del hipervínculo
         def extract_name_from_hyperlink(formula):
             if isinstance(formula, str) and '=HYPERLINK' in formula:
-                match = re.search(r'';"([^"]+)"\)', formula)
+                # *** LÍNEA CORREGIDA ***
+                match = re.search(r';"([^"]+)"\)', formula)
                 return match.group(1).replace('""', '"') if match else formula
             return formula
 
