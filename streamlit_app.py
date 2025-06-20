@@ -19,7 +19,7 @@ try:
     client = gspread.authorize(creds)
     
     # Reemplaza con el nombre exacto de tu hoja de cálculo
-    SPREADSHEET_NAME = "extraccion_fisioterapia_datos" 
+    SPREADSHEET_NAME = "Resultados Informes Fisioterapia" 
     sheet = client.open(SPREADSHEET_NAME).sheet1
     
     @st.cache_data(ttl=600) # Cache por 10 minutos
