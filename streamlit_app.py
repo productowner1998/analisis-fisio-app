@@ -24,7 +24,6 @@ def style_difference(val):
             color = '#28a745'  # Verde sutil
         elif val_float < 0:
             color = '#dc3545'  # Rojo sutil
-        # Si es 0, el color se mantiene como 'inherit' (por defecto)
     except (ValueError, TypeError):
         pass # Se mantiene el color por defecto para 'N/A' o 'Error'
     return f'color: {color}'
@@ -41,30 +40,18 @@ try:
     
     @st.cache_data(ttl=600)
     def load_data():
-        # Obtenemos los valores con las FÓRMULAS para poder extraer los hipervínculos
-        all_values = sheet.get_all_values(value_render_option='FORMULA')
-        if not all_values:
-            return pd.DataFrame() # Devuelve un DataFrame vacío si la hoja no tiene datos
+        # Obtenemos los valores como texto visible, no como fórmulas
+        data = sheet.get_all_records()
+        if not data:
+            return pd.DataFrame()
             
-        headers = all_values[0]
-        data = all_values[1:]
-        df = pd.DataFrame(data, columns=headers)
-        
-        # Función robusta para extraer el nombre limpio del hipervínculo
-        def extract_name_from_hyperlink(formula):
-            if isinstance(formula, str) and '=HYPERLINK' in formula:
-                # *** LÍNEA CORREGIDA ***
-                match = re.search(r';"([^"]+)"\)', formula)
-                return match.group(1).replace('""', '"') if match else formula
-            return formula
-
-        df['Nombre Limpio'] = df['Nombre Paciente'].apply(extract_name_from_hyperlink)
+        df = pd.DataFrame(data)
         
         # Asegurar que la columna de Identificación sea de tipo string y sin espacios extra
         df['Identificación'] = df['Identificación'].astype(str).str.strip()
 
         # Convertir columnas de datos a tipo numérico y luego a entero (manejando N/A)
-        columnas_datos = [col for col in df.columns if col not in ['Nombre Archivo', 'Nombre Paciente', 'Identificación', 'Periodo', 'Nombre Limpio']]
+        columnas_datos = [col for col in df.columns if col not in ['Nombre Archivo', 'Nombre Paciente', 'Identificación', 'Periodo']]
         for col in columnas_datos:
              numeric_col = pd.to_numeric(df[col], errors='coerce')
              df[col] = numeric_col.astype('Int64')
@@ -85,9 +72,9 @@ st.write("Esta aplicación te permite comparar dos valoraciones de un paciente p
 if data_loaded_successfully:
     
     # Crear una lista de pacientes únicos para el dropdown
-    unique_patients_df = df[['Nombre Limpio', 'Identificación']].dropna(subset=['Nombre Limpio', 'Identificación']).drop_duplicates()
-    unique_patients_df['display_label'] = unique_patients_df['Nombre Limpio'] + " (" + unique_patients_df['Identificación'].astype(str) + ")"
-    patient_options = sorted(unique_patients_df['display_label'].tolist()) # Ordenar alfabéticamente
+    unique_patients_df = df[['Nombre Paciente', 'Identificación']].dropna().drop_duplicates()
+    unique_patients_df['display_label'] = unique_patients_df['Nombre Paciente'] + " (" + unique_patients_df['Identificación'].astype(str) + ")"
+    patient_options = sorted(unique_patients_df['display_label'].tolist())
     
     st.header("1. Seleccionar Paciente")
     selected_patient_label = st.selectbox(
@@ -105,7 +92,7 @@ if data_loaded_successfully:
             
             # Filtrar el DataFrame principal usando el ID extraído
             patient_records = df[df['Identificación'] == selected_id_str]
-            patient_name = unique_patients_df[unique_patients_df['display_label'] == selected_patient_label]['Nombre Limpio'].iloc[0]
+            patient_name = unique_patients_df[unique_patients_df['display_label'] == selected_patient_label]['Nombre Paciente'].iloc[0]
             
             st.success(f"Paciente seleccionado: **{patient_name}**")
 
@@ -128,19 +115,10 @@ if data_loaded_successfully:
 
                     st.subheader("Resultados del Análisis")
                     
-                    def extract_url_from_hyperlink(formula):
-                        if isinstance(formula, str) and '=HYPERLINK' in formula:
-                            match = re.search(r'HYPERLINK\("([^"]+)"', formula)
-                            return match.group(1) if match else "#"
-                        return "#"
-                    
-                    url_comp = extract_url_from_hyperlink(record_comp['Nombre Paciente'])
-                    url_evol = extract_url_from_hyperlink(record_evol['Nombre Paciente'])
-
-                    st.write(f"Comparando la valoración de **{fecha_comparativa}** ([ver PDF]({url_comp})) con la de **{fecha_evolutiva}** ([ver PDF]({url_evol})).")
+                    st.write(f"Comparando la valoración de **{fecha_comparativa}** con la de **{fecha_evolutiva}**.")
                     
                     resultados = []
-                    columnas_analisis = [col for col in df.columns if col not in ['Nombre Archivo', 'Nombre Paciente', 'Identificación', 'Periodo', 'Nombre Limpio']]
+                    columnas_analisis = [col for col in df.columns if col not in ['Nombre Archivo', 'Nombre Paciente', 'Identificación', 'Periodo']]
 
                     for col in columnas_analisis:
                         val_comp = record_comp[col]
@@ -165,15 +143,12 @@ if data_loaded_successfully:
                     
                     df_resultados = pd.DataFrame(resultados).set_index("Etiqueta")
                     
-                    # Formatear la columna de diferencia para que no tenga decimales al mostrarse
-                    # y aplicar el estilo de color.
                     st.dataframe(df_resultados.style.format(
                         {"Diferencia (Evolutiva - Comparativa)": "{:.0f}"}
                     ).apply(
                         lambda x: x.map(style_difference), subset=['Diferencia (Evolutiva - Comparativa)']
                     ))
     else:
-        # Esto previene que se muestren los selectores de fecha si no hay paciente seleccionado
         pass
 else:
     st.info("La aplicación no puede cargar los datos. Por favor, contacta al administrador.")
