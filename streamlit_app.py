@@ -15,7 +15,7 @@ st.set_page_config(
 def style_difference(val):
     """
     Aplica un color sutil a los valores de diferencia.
-    Verde para positivo, Rojo para negativo.
+    Verde para positivo, Rojo para negativo. 0 y N/A se ignoran.
     """
     color = 'inherit' # Color por defecto
     try:
@@ -24,6 +24,7 @@ def style_difference(val):
             color = '#28a745'  # Verde sutil
         elif val_float < 0:
             color = '#dc3545'  # Rojo sutil
+        # Si es 0, el color se mantiene como 'inherit' (por defecto)
     except (ValueError, TypeError):
         pass # Se mantiene el color por defecto para 'N/A' o 'Error'
     return f'color: {color}'
@@ -42,6 +43,9 @@ try:
     def load_data():
         # Obtenemos los valores con las FÓRMULAS para poder extraer los hipervínculos
         all_values = sheet.get_all_values(value_render_option='FORMULA')
+        if not all_values:
+            return pd.DataFrame() # Devuelve un DataFrame vacío si la hoja no tiene datos
+            
         headers = all_values[0]
         data = all_values[1:]
         df = pd.DataFrame(data, columns=headers)
@@ -49,7 +53,7 @@ try:
         # Función robusta para extraer el nombre limpio del hipervínculo
         def extract_name_from_hyperlink(formula):
             if isinstance(formula, str) and '=HYPERLINK' in formula:
-                match = re.search(r';"([^"]+)"\)', formula)
+                match = re.search(r'';"([^"]+)"\)', formula)
                 return match.group(1).replace('""', '"') if match else formula
             return formula
 
@@ -66,7 +70,7 @@ try:
         return df
 
     df = load_data()
-    data_loaded_successfully = True
+    data_loaded_successfully = not df.empty
 except Exception as e:
     st.error(f"Error al conectar con Google Sheets: {e}")
     st.error("Asegúrate de haber configurado los 'Secrets' en Streamlit Cloud y compartido la hoja de cálculo con el email del servicio.")
@@ -82,7 +86,7 @@ if data_loaded_successfully:
     # Crear una lista de pacientes únicos para el dropdown
     unique_patients_df = df[['Nombre Limpio', 'Identificación']].dropna(subset=['Nombre Limpio', 'Identificación']).drop_duplicates()
     unique_patients_df['display_label'] = unique_patients_df['Nombre Limpio'] + " (" + unique_patients_df['Identificación'].astype(str) + ")"
-    patient_options = unique_patients_df['display_label'].tolist()
+    patient_options = sorted(unique_patients_df['display_label'].tolist()) # Ordenar alfabéticamente
     
     st.header("1. Seleccionar Paciente")
     selected_patient_label = st.selectbox(
@@ -160,7 +164,13 @@ if data_loaded_successfully:
                     
                     df_resultados = pd.DataFrame(resultados).set_index("Etiqueta")
                     
-                    st.dataframe(df_resultados.style.applymap(style_difference, subset=['Diferencia (Evolutiva - Comparativa)']))
+                    # Formatear la columna de diferencia para que no tenga decimales al mostrarse
+                    # y aplicar el estilo de color.
+                    st.dataframe(df_resultados.style.format(
+                        {"Diferencia (Evolutiva - Comparativa)": "{:.0f}"}
+                    ).apply(
+                        lambda x: x.map(style_difference), subset=['Diferencia (Evolutiva - Comparativa)']
+                    ))
     else:
         # Esto previene que se muestren los selectores de fecha si no hay paciente seleccionado
         pass
