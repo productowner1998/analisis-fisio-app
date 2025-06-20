@@ -54,6 +54,7 @@ def get_analysis_description(difference):
     except (ValueError, TypeError):
         return "No se pudo interpretar la diferencia."
 
+    # Lógica actualizada para valores negativos
     if diff_val < 0:
         return "No presenta aumento. No se ha observado progreso en ese aspecto evaluado."
     if diff_val == 0:
@@ -95,17 +96,11 @@ try:
     
     @st.cache_data(ttl=600)
     def load_data():
-        # Obtenemos los valores como texto visible, no como fórmulas
         data = sheet.get_all_records()
         if not data:
             return pd.DataFrame()
-            
         df = pd.DataFrame(data)
-        
-        # Asegurar que la columna de Identificación sea de tipo string y sin espacios extra
         df['Identificación'] = df['Identificación'].astype(str).str.strip()
-
-        # Convertir columnas de datos a tipo numérico y luego a entero (manejando N/A)
         columnas_datos = [col for col in df.columns if col not in ['Nombre Archivo', 'Nombre Paciente', 'Identificación', 'Periodo']]
         for col in columnas_datos:
              numeric_col = pd.to_numeric(df[col], errors='coerce')
@@ -126,7 +121,6 @@ st.write("Esta aplicación te permite comparar dos valoraciones de un paciente p
 
 if data_loaded_successfully:
     
-    # Crear una lista de pacientes únicos para el dropdown
     unique_patients_df = df[['Nombre Paciente', 'Identificación']].dropna().drop_duplicates()
     unique_patients_df['display_label'] = unique_patients_df['Nombre Paciente'] + " (" + unique_patients_df['Identificación'].astype(str) + ")"
     patient_options = sorted(unique_patients_df['display_label'].tolist())
@@ -140,12 +134,9 @@ if data_loaded_successfully:
     )
 
     if selected_patient_label:
-        # Extraer el ID de la etiqueta del dropdown
         match = re.search(r'\((\d+)\)', selected_patient_label)
         if match:
             selected_id_str = match.group(1)
-            
-            # Filtrar el DataFrame principal usando el ID extraído
             patient_records = df[df['Identificación'] == selected_id_str]
             patient_name = unique_patients_df[unique_patients_df['display_label'] == selected_patient_label]['Nombre Paciente'].iloc[0]
             
@@ -153,7 +144,6 @@ if data_loaded_successfully:
 
             st.header("2. Seleccionar Periodos de Comparación")
             available_periods = patient_records['Periodo'].unique().tolist()
-
             col1, col2 = st.columns(2)
             with col1:
                 fecha_comparativa = st.selectbox("Fecha Comparativa (punto de partida)", options=available_periods, index=None, placeholder="Elige una fecha")
@@ -167,47 +157,46 @@ if data_loaded_successfully:
                 else:
                     record_comp = patient_records[patient_records['Periodo'] == fecha_comparativa].iloc[0]
                     record_evol = patient_records[patient_records['Periodo'] == fecha_evolutiva].iloc[0]
-
-                    st.subheader("Resultados del Análisis")
                     
-                    st.write(f"Comparando la valoración de **{fecha_comparativa}** con la de **{fecha_evolutiva}**.")
-                    
-                    resultados = []
-                    columnas_analisis = [col for col in df.columns if col not in ['Nombre Archivo', 'Nombre Paciente', 'Identificación', 'Periodo']]
-
-                    for col in columnas_analisis:
-                        val_comp = record_comp[col]
-                        val_evol = record_evol[col]
+                    # --- LÓGICA DEL MODAL ---
+                    with st.dialog("Resultados del Análisis"):
+                        st.write(f"Comparando la valoración de **{fecha_comparativa}** con la de **{fecha_evolutiva}**.")
                         
-                        display_comp = "N/A" if pd.isna(val_comp) else int(val_comp)
-                        display_evol = "N/A" if pd.isna(val_evol) else int(val_evol)
+                        resultados = []
+                        columnas_analisis = [col for col in df.columns if col not in ['Nombre Archivo', 'Nombre Paciente', 'Identificación', 'Periodo']]
 
-                        diferencia = "N/A"
-                        if pd.notna(val_comp) and pd.notna(val_evol):
-                            try:
-                                diferencia = int(val_evol) - int(val_comp)
-                            except (ValueError, TypeError):
-                                diferencia = "Error"
+                        for col in columnas_analisis:
+                            val_comp = record_comp[col]
+                            val_evol = record_evol[col]
+                            
+                            display_comp = "N/A" if pd.isna(val_comp) else int(val_comp)
+                            display_evol = "N/A" if pd.isna(val_evol) else int(val_evol)
+
+                            diferencia = "N/A"
+                            if pd.notna(val_comp) and pd.notna(val_evol):
+                                try:
+                                    diferencia = int(val_evol) - int(val_comp)
+                                except (ValueError, TypeError):
+                                    diferencia = "Error"
+                            
+                            analisis = get_analysis_description(diferencia)
+
+                            resultados.append({
+                                "Etiqueta": col,
+                                f"Valor ({fecha_comparativa})": display_comp,
+                                f"Valor ({fecha_evolutiva})": display_evol,
+                                "Diferencia": diferencia,
+                                "Análisis": analisis
+                            })
                         
-                        # Obtener la descripción del análisis
-                        analisis = get_analysis_description(diferencia)
-
-                        resultados.append({
-                            "Etiqueta": col,
-                            f"Valor ({fecha_comparativa})": display_comp,
-                            f"Valor ({fecha_evolutiva})": display_evol,
-                            "Diferencia (Evolutiva - Comparativa)": diferencia,
-                            "Análisis": analisis
-                        })
-                    
-                    df_resultados = pd.DataFrame(resultados).set_index("Etiqueta")
-                    
-                    # Usar st.table para una tabla estática y no desplazable.
-                    st.table(df_resultados.style.format(
-                        formatter={"Diferencia (Evolutiva - Comparativa)": format_difference}
-                    ).apply(
-                        lambda x: x.map(style_difference), subset=['Diferencia (Evolutiva - Comparativa)']
-                    ))
+                        df_resultados = pd.DataFrame(resultados).set_index("Etiqueta")
+                        
+                        # Usar st.table para una tabla estática y no desplazable.
+                        st.table(df_resultados.style.format(
+                            formatter={"Diferencia": format_difference}
+                        ).apply(
+                            lambda x: x.map(style_difference), subset=['Diferencia']
+                        ))
     else:
         pass
 else:
