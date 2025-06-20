@@ -11,72 +11,22 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- FUNCIÓN DE INTERPRETACIÓN CLÍNICA ---
-def get_progress_description(difference):
+# --- FUNCIÓN PARA APLICAR ESTILO DE COLOR ---
+def style_difference(val):
     """
-    Asigna una descripción clínica e icono basado en la diferencia numérica.
-    Retorna una tupla (icono, texto_descripcion).
+    Aplica un color sutil a los valores de diferencia.
+    Verde para positivo, Rojo para negativo.
     """
-    if difference == "N/A" or difference == "Error":
-        return " ", "No aplica. El paciente no fue evaluado por razones clínicas o porque ese ítem no está siendo trabajado."
-
+    color = 'black' # Color por defecto
     try:
-        diff_val = float(difference)
+        val_float = float(val)
+        if val_float > 0:
+            color = '#28a745'  # Verde sutil
+        elif val_float < 0:
+            color = '#dc3545'  # Rojo sutil
     except (ValueError, TypeError):
-        return " ", "No se pudo interpretar la diferencia."
-
-    if diff_val < 0:
-        return "🔻", "Regresión. Se ha observado un retroceso en este ítem."
-    if diff_val == 0:
-        return " ", "No presenta aumento. No se ha observado progreso en ese aspecto evaluado."
-
-    # Si es positivo, el icono es verde y elegante.
-    icon = "✅"
-    
-    # Mapeo de rangos de diferencia a descripciones
-    if 1 <= diff_val <= 5.9:
-        return icon, "Leve mejoría, apenas perceptible."
-    elif 6 <= diff_val <= 10.9:
-        return icon, "Mejora ligera, posiblemente inicial o marginal."
-    elif 11 <= diff_val <= 15.9:
-        return icon, "Mejora leve pero ya observable."
-    elif 16 <= diff_val <= 20.9:
-        return icon, "Progreso clínicamente moderado."
-    elif 21 <= diff_val <= 25.9:
-        return icon, "Mejora establecida, aunque todavía moderada."
-    elif 26 <= diff_val <= 30.9:
-        return icon, "Progreso consistente y significativo."
-    elif 31 <= diff_val <= 35.9:
-        return icon, "Mejora marcada, buen avance terapéutico."
-    elif 36 <= diff_val <= 40.9:
-        return icon, "Progreso importante."
-    elif 41 <= diff_val <= 45.9:
-        return icon, "Avance clínicamente sólido."
-    elif 46 <= diff_val <= 50.9:
-        return icon, "Mejora significativa, cercana a la mitad del máximo esperado."
-    elif 51 <= diff_val <= 55.9:
-        return icon, "Ya se supera la mitad del potencial de mejora."
-    elif 56 <= diff_val <= 60.9:
-        return icon, "Mejora clara y continua."
-    elif 61 <= diff_val <= 65.9:
-        return icon, "Alto nivel de progreso."
-    elif 66 <= diff_val <= 70.9:
-        return icon, "Progreso muy destacado."
-    elif 71 <= diff_val <= 75.9:
-        return icon, "El paciente se acerca al máximo de mejora posible."
-    elif 76 <= diff_val <= 80.9:
-        return icon, "Gran mejora, resultado clínicamente excelente."
-    elif 81 <= diff_val <= 85.9:
-        return icon, "Alta recuperación o efectividad del tratamiento."
-    elif 86 <= diff_val <= 90.9:
-        return icon, "Nivel casi óptimo."
-    elif 91 <= diff_val <= 95.9:
-        return icon, "Progreso casi completo."
-    elif 96 <= diff_val <= 100:
-        return icon, "Mejora máxima alcanzada según los ítems evaluados."
-    else:
-        return icon, "Progreso positivo no categorizado."
-
+        pass # Se mantiene el color por defecto para 'N/A' o 'Error'
+    return f'color: {color}'
 
 # --- CONEXIÓN A GOOGLE SHEETS Y CARGA DE DATOS ---
 try:
@@ -90,8 +40,11 @@ try:
     
     @st.cache_data(ttl=600)
     def load_data():
-        data = sheet.get_all_records()
-        df = pd.DataFrame(data)
+        # Obtenemos los valores con las FÓRMULAS para poder extraer los hipervínculos
+        all_values = sheet.get_all_values(value_render_option='FORMULA')
+        headers = all_values[0]
+        data = all_values[1:]
+        df = pd.DataFrame(data, columns=headers)
         
         def extract_name_from_hyperlink(formula):
             if isinstance(formula, str):
@@ -159,15 +112,17 @@ if data_loaded_successfully:
                 st.subheader("Resultados del Análisis")
                 
                 def extract_url_from_hyperlink(formula):
-                    match = re.search(r'HYPERLINK\("([^"]+)"', formula)
-                    return match.group(1) if match else "#"
+                    if isinstance(formula, str):
+                        match = re.search(r'HYPERLINK\("([^"]+)"', formula)
+                        return match.group(1) if match else "#"
+                    return "#"
                 
                 url_comp = extract_url_from_hyperlink(record_comp['Nombre Paciente'])
                 url_evol = extract_url_from_hyperlink(record_evol['Nombre Paciente'])
 
                 st.write(f"Comparando la valoración de **{fecha_comparativa}** ([ver PDF]({url_comp})) con la de **{fecha_evolutiva}** ([ver PDF]({url_evol})).")
-                st.markdown("---")
-
+                
+                resultados = []
                 columnas_analisis = [col for col in df.columns if col not in ['Nombre Archivo', 'Nombre Paciente', 'Identificación', 'Periodo', 'Nombre Limpio']]
 
                 for col in columnas_analisis:
@@ -177,34 +132,21 @@ if data_loaded_successfully:
                     diferencia = "N/A"
                     if val_comp != "N/A" and val_evol != "N/A":
                         try:
-                            # Calcular la diferencia con decimales
                             diferencia = round(float(val_evol) - float(val_comp), 2)
                         except (ValueError, TypeError):
                             diferencia = "Error"
                     
-                    # Mostrar el título de la etiqueta de forma destacada
-                    st.markdown(f"#### {col}")
-
-                    # Mostrar los valores y la diferencia en columnas
-                    v_col1, v_col2, v_col3 = st.columns(3)
-                    with v_col1:
-                        st.metric(label=f"Valor ({fecha_comparativa})", value=val_comp)
-                    with v_col2:
-                        st.metric(label=f"Valor ({fecha_evolutiva})", value=val_evol)
-                    with v_col3:
-                        st.metric(label="Diferencia", value=diferencia)
-
-                    # Obtener y mostrar la descripción con el ícono
-                    icon, desc_text = get_progress_description(diferencia)
-                    
-                    if icon == "✅":
-                        st.markdown(f"> :green[{icon} {desc_text}]")
-                    elif icon == "🔻":
-                        st.markdown(f"> :red[{icon} {desc_text}]")
-                    else:
-                        st.markdown(f"> {desc_text}")
-                    
-                    st.markdown("---") # Separador para el siguiente ítem
+                    resultados.append({
+                        "Etiqueta": col,
+                        f"Valor ({fecha_comparativa})": val_comp,
+                        f"Valor ({fecha_evolutiva})": val_evol,
+                        "Diferencia (Evolutiva - Comparativa)": diferencia
+                    })
+                
+                df_resultados = pd.DataFrame(resultados).set_index("Etiqueta")
+                
+                # Aplicar el estilo de color y mostrar la tabla compacta
+                st.dataframe(df_resultados.style.applymap(style_difference, subset=['Diferencia (Evolutiva - Comparativa)']))
 
 else:
     st.info("La aplicación no puede cargar los datos. Por favor, contacta al administrador.")
