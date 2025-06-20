@@ -158,45 +158,45 @@ if data_loaded_successfully:
                     record_comp = patient_records[patient_records['Periodo'] == fecha_comparativa].iloc[0]
                     record_evol = patient_records[patient_records['Periodo'] == fecha_evolutiva].iloc[0]
                     
-                    # --- LÓGICA DEL MODAL ---
-                    with st.dialog("Resultados del Análisis"):
-                        st.write(f"Comparando la valoración de **{fecha_comparativa}** con la de **{fecha_evolutiva}**.")
-                        
-                        resultados = []
-                        columnas_analisis = [col for col in df.columns if col not in ['Nombre Archivo', 'Nombre Paciente', 'Identificación', 'Periodo']]
+                    # --- LÓGICA SIN MODAL ---
+                    st.subheader("Resultados del Análisis")
+                    st.write(f"Comparando la valoración de **{fecha_comparativa}** con la de **{fecha_evolutiva}**.")
+                    
+                    resultados = []
+                    columnas_analisis = [col for col in df.columns if col not in ['Nombre Archivo', 'Nombre Paciente', 'Identificación', 'Periodo']]
 
-                        for col in columnas_analisis:
-                            val_comp = record_comp[col]
-                            val_evol = record_evol[col]
-                            
-                            display_comp = "N/A" if pd.isna(val_comp) else int(val_comp)
-                            display_evol = "N/A" if pd.isna(val_evol) else int(val_evol)
-
-                            diferencia = "N/A"
-                            if pd.notna(val_comp) and pd.notna(val_evol):
-                                try:
-                                    diferencia = int(val_evol) - int(val_comp)
-                                except (ValueError, TypeError):
-                                    diferencia = "Error"
-                            
-                            analisis = get_analysis_description(diferencia)
-
-                            resultados.append({
-                                "Etiqueta": col,
-                                f"Valor ({fecha_comparativa})": display_comp,
-                                f"Valor ({fecha_evolutiva})": display_evol,
-                                "Diferencia": diferencia,
-                                "Análisis": analisis
-                            })
+                    for col in columnas_analisis:
+                        val_comp = record_comp[col]
+                        val_evol = record_evol[col]
                         
-                        df_resultados = pd.DataFrame(resultados).set_index("Etiqueta")
+                        display_comp = "N/A" if pd.isna(val_comp) else int(val_comp)
+                        display_evol = "N/A" if pd.isna(val_evol) else int(val_evol)
+
+                        diferencia = "N/A"
+                        if pd.notna(val_comp) and pd.notna(val_evol):
+                            try:
+                                diferencia = int(val_evol) - int(val_comp)
+                            except (ValueError, TypeError):
+                                diferencia = "Error"
                         
-                        # Usar st.table para una tabla estática y no desplazable.
-                        st.table(df_resultados.style.format(
-                            formatter={"Diferencia": format_difference}
-                        ).apply(
-                            lambda x: x.map(style_difference), subset=['Diferencia']
-                        ))
+                        analisis = get_analysis_description(diferencia)
+
+                        resultados.append({
+                            "Etiqueta": col,
+                            f"Valor ({fecha_comparativa})": display_comp,
+                            f"Valor ({fecha_evolutiva})": display_evol,
+                            "Diferencia": diferencia,
+                            "Análisis": analisis
+                        })
+                    
+                    df_resultados = pd.DataFrame(resultados).set_index("Etiqueta")
+                    
+                    # Usar st.table para una tabla estática y no desplazable.
+                    st.table(df_resultados.style.format(
+                        formatter={"Diferencia": format_difference}
+                    ).apply(
+                        lambda x: x.map(style_difference), subset=['Diferencia']
+                    ))
     else:
         pass
 else:
