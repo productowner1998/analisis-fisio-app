@@ -55,7 +55,7 @@ def get_analysis_description(difference):
         return "No se pudo interpretar la diferencia."
 
     if diff_val < 0:
-        return "No presenta aumento. El paciente no fue evaluado por razones clínicas o porque ese ítem no está siendo trabajado."
+        return "No presenta aumento. No se ha observado progreso en ese aspecto evaluado."
     if diff_val == 0:
         return "No presenta aumento. No se ha observado progreso en ese aspecto evaluado."
 
