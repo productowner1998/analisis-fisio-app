@@ -11,36 +11,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- FUNCIÓN PARA APLICAR ESTILO DE COLOR ---
-def style_difference(val):
-    """
-    Aplica color a los valores de diferencia.
-    Verde para positivo, Rojo para negativo. 0 y N/A se ignoran.
-    """
-    color = 'inherit' # Color por defecto
-    try:
-        val_float = float(val)
-        if val_float > 0:
-            color = 'green'
-        elif val_float < 0:
-            color = 'red'
-    except (ValueError, TypeError):
-        pass # Se mantiene el color por defecto para 'N/A' o 'Error'
-    return f'color: {color}'
-
-# --- FUNCIÓN PARA FORMATEAR LA DIFERENCIA ---
-def format_difference(val):
-    """
-    Formatea la diferencia para mostrarla como un entero, manejando N/A.
-    """
-    if val == "N/A" or val == "Error":
-        return val
-    try:
-        # Formatea como entero sin decimales
-        return f"{int(val):d}"
-    except (ValueError, TypeError):
-        return '' # Devuelve vacío si no se puede convertir
-
 # --- FUNCIÓN PARA OBTENER EL ANÁLISIS CLÍNICO ---
 def get_analysis_description(difference):
     """
@@ -163,7 +133,36 @@ if data_loaded_successfully:
                     
                     st.write(f"Comparando la valoración de **{fecha_comparativa}** ([ver PDF]({url_comp})) con la de **{fecha_evolutiva}** ([ver PDF]({url_evol})).")
                     
-                    resultados = []
+                    # --- GENERACIÓN DE TABLA HTML PERSONALIZADA ---
+                    
+                    html_style = """
+                    <style>
+                        .results-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+                        .results-table th, .results-table td { border: 1px solid #e1e1e1; padding: 10px; text-align: left; }
+                        .results-table th { background-color: #f7f7f9; font-weight: bold; }
+                        .positive { color: green; }
+                        .negative { color: red; }
+                    </style>
+                    """
+                    
+                    header_valor_comp = f"Valor ({fecha_comparativa})"
+                    header_valor_evol = f"Valor ({fecha_evolutiva})"
+                    
+                    html_table = f"""
+                    {html_style}
+                    <table class="results-table">
+                        <thead>
+                            <tr>
+                                <th style="width:25%;">Etiqueta</th>
+                                <th style="width:10%;">{header_valor_comp}</th>
+                                <th style="width:10%;">{header_valor_evol}</th>
+                                <th style="width:10%;">% Diff.</th>
+                                <th>Análisis</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                    """
+                    
                     columnas_analisis = [col for col in df.columns if col not in ['Nombre Archivo', 'Nombre Paciente', 'Identificación', 'Periodo', 'URL_PDF']]
 
                     for col in columnas_analisis:
@@ -182,23 +181,24 @@ if data_loaded_successfully:
                         
                         analisis = get_analysis_description(diferencia)
                         
-                        # Se usa el nuevo nombre de columna "% Diff."
-                        resultados.append({
-                            "Etiqueta": col,
-                            f"Valor ({fecha_comparativa})": display_comp,
-                            f"Valor ({fecha_evolutiva})": display_evol,
-                            "% Diff.": diferencia,
-                            "Análisis": analisis
-                        })
+                        diff_class = ""
+                        if isinstance(diferencia, int):
+                            if diferencia > 0: diff_class = "positive"
+                            elif diferencia < 0: diff_class = "negative"
+
+                        html_table += f"""
+                            <tr>
+                                <td>{col}</td>
+                                <td>{display_comp}</td>
+                                <td>{display_evol}</td>
+                                <td class="{diff_class}">{diferencia}</td>
+                                <td>{analisis}</td>
+                            </tr>
+                        """
                     
-                    df_resultados = pd.DataFrame(resultados).set_index("Etiqueta")
+                    html_table += "</tbody></table>"
                     
-                    # Se usa st.dataframe y se aplica el estilo a la nueva columna "% Diff."
-                    st.dataframe(df_resultados.style.format(
-                        formatter={"% Diff.": format_difference}
-                    ).apply(
-                        lambda x: x.map(style_difference), subset=['% Diff.']
-                    ))
+                    st.markdown(html_table, unsafe_allow_html=True)
     else:
         pass
 else:
