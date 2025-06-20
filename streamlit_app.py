@@ -46,17 +46,23 @@ try:
         data = all_values[1:]
         df = pd.DataFrame(data, columns=headers)
         
+        # Función mejorada para extraer el nombre limpio del hipervínculo
         def extract_name_from_hyperlink(formula):
-            if isinstance(formula, str):
-                match = re.search(r'";"([^"]+)"\)', formula)
-                return match.group(1) if match else formula
+            if isinstance(formula, str) and formula.startswith('=HYPERLINK'):
+                match = re.search(r';"([^"]+)"\)', formula)
+                # Si la regex funciona, devuelve el nombre limpio. Si no, devuelve el texto original.
+                return match.group(1).replace('""', '"') if match else formula
             return formula
 
         df['Nombre Limpio'] = df['Nombre Paciente'].apply(extract_name_from_hyperlink)
         
+        # Convertir columnas de datos a tipo numérico y luego a entero (manejando N/A)
         columnas_datos = [col for col in df.columns if col not in ['Nombre Archivo', 'Nombre Paciente', 'Identificación', 'Periodo', 'Nombre Limpio']]
         for col in columnas_datos:
-             df[col] = pd.to_numeric(df[col], errors='coerce').fillna('N/A')
+             # Convertir a numérico, los no-números serán NaT/NaN
+             numeric_col = pd.to_numeric(df[col], errors='coerce')
+             # Convertir a tipo Int64 que soporta nulos (pd.NA) y no usa decimales
+             df[col] = numeric_col.astype('Int64')
         return df
 
     df = load_data()
@@ -73,7 +79,8 @@ st.write("Esta aplicación te permite comparar dos valoraciones de un paciente p
 
 if data_loaded_successfully:
     
-    unique_patients_df = df[['Nombre Limpio', 'Identificación']].drop_duplicates()
+    # Crear una lista de pacientes únicos para el dropdown
+    unique_patients_df = df[['Nombre Limpio', 'Identificación']].dropna(subset=['Nombre Limpio', 'Identificación']).drop_duplicates()
     unique_patients_df['display_label'] = unique_patients_df['Nombre Limpio'] + " (" + unique_patients_df['Identificación'].astype(str) + ")"
     patient_options = unique_patients_df['display_label'].tolist()
     
@@ -86,8 +93,9 @@ if data_loaded_successfully:
     )
 
     if selected_patient_label:
-        selected_id = unique_patients_df[unique_patients_df['display_label'] == selected_patient_label]['Identificación'].iloc[0]
-        patient_records = df[df['Identificación'] == selected_id]
+        selected_id_str = re.search(r'\((\d+)\)', selected_patient_label).group(1)
+        
+        patient_records = df[df['Identificación'] == selected_id_str]
         patient_name = unique_patients_df[unique_patients_df['display_label'] == selected_patient_label]['Nombre Limpio'].iloc[0]
         
         st.success(f"Paciente seleccionado: **{patient_name}**")
@@ -129,17 +137,22 @@ if data_loaded_successfully:
                     val_comp = record_comp[col]
                     val_evol = record_evol[col]
                     
+                    # Para la visualización, reemplazamos el NA de pandas por el string "N/A"
+                    display_comp = "N/A" if pd.isna(val_comp) else val_comp
+                    display_evol = "N/A" if pd.isna(val_evol) else val_evol
+
                     diferencia = "N/A"
-                    if val_comp != "N/A" and val_evol != "N/A":
+                    if pd.notna(val_comp) and pd.notna(val_evol):
                         try:
-                            diferencia = round(float(val_evol) - float(val_comp), 2)
+                            # El cálculo se realiza con los valores enteros
+                            diferencia = val_evol - val_comp
                         except (ValueError, TypeError):
                             diferencia = "Error"
                     
                     resultados.append({
                         "Etiqueta": col,
-                        f"Valor ({fecha_comparativa})": val_comp,
-                        f"Valor ({fecha_evolutiva})": val_evol,
+                        f"Valor ({fecha_comparativa})": display_comp,
+                        f"Valor ({fecha_evolutiva})": display_evol,
                         "Diferencia (Evolutiva - Comparativa)": diferencia
                     })
                 
