@@ -143,9 +143,8 @@ if data_loaded_successfully:
                     
                     df_resultados = pd.DataFrame(resultados).set_index("Etiqueta")
                     
-                    st.dataframe(df_resultados.style.format(
-                        {"Diferencia (Evolutiva - Comparativa)": "{:.0f}"}
-                    ).apply(
+                    # Se elimina el formateador problemático y se confía en el estilo y el tipo de datos.
+                    st.dataframe(df_resultados.style.apply(
                         lambda x: x.map(style_difference), subset=['Diferencia (Evolutiva - Comparativa)']
                     ))
     else:
