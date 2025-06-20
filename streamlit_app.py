@@ -54,13 +54,11 @@ def get_analysis_description(difference):
     except (ValueError, TypeError):
         return "No se pudo interpretar la diferencia."
 
-    # Lógica actualizada para valores negativos
     if diff_val < 0:
         return "No presenta aumento. No se ha observado progreso en ese aspecto evaluado."
     if diff_val == 0:
         return "No presenta aumento. No se ha observado progreso en ese aspecto evaluado."
 
-    # Mapeo de rangos de diferencia a descripciones
     if 0.5 <= diff_val <= 5.9: return "Leve mejoría, apenas perceptible."
     if 6 <= diff_val <= 10.9: return "Mejora ligera, posiblemente inicial o marginal."
     if 11 <= diff_val <= 15.9: return "Mejora leve pero ya observable."
@@ -101,7 +99,8 @@ try:
             return pd.DataFrame()
         df = pd.DataFrame(data)
         df['Identificación'] = df['Identificación'].astype(str).str.strip()
-        columnas_datos = [col for col in df.columns if col not in ['Nombre Archivo', 'Nombre Paciente', 'Identificación', 'Periodo']]
+        # *** CAMBIO: Se añade 'URL_PDF' a la lista de columnas a no convertir ***
+        columnas_datos = [col for col in df.columns if col not in ['Nombre Archivo', 'Nombre Paciente', 'Identificación', 'Periodo', 'URL_PDF']]
         for col in columnas_datos:
              numeric_col = pd.to_numeric(df[col], errors='coerce')
              df[col] = numeric_col.astype('Int64')
@@ -157,13 +156,19 @@ if data_loaded_successfully:
                 else:
                     record_comp = patient_records[patient_records['Periodo'] == fecha_comparativa].iloc[0]
                     record_evol = patient_records[patient_records['Periodo'] == fecha_evolutiva].iloc[0]
-                    
+
                     # --- LÓGICA SIN MODAL ---
                     st.subheader("Resultados del Análisis")
-                    st.write(f"Comparando la valoración de **{fecha_comparativa}** con la de **{fecha_evolutiva}**.")
+                    
+                    # *** CAMBIO: Se obtienen las URLs de la nueva columna ***
+                    url_comp = record_comp.get('URL_PDF', '#')
+                    url_evol = record_evol.get('URL_PDF', '#')
+                    
+                    st.write(f"Comparando la valoración de **{fecha_comparativa}** ([ver PDF]({url_comp})) con la de **{fecha_evolutiva}** ([ver PDF]({url_evol})).")
                     
                     resultados = []
-                    columnas_analisis = [col for col in df.columns if col not in ['Nombre Archivo', 'Nombre Paciente', 'Identificación', 'Periodo']]
+                    # *** CAMBIO: Se excluye 'URL_PDF' del análisis de etiquetas ***
+                    columnas_analisis = [col for col in df.columns if col not in ['Nombre Archivo', 'Nombre Paciente', 'Identificación', 'Periodo', 'URL_PDF']]
 
                     for col in columnas_analisis:
                         val_comp = record_comp[col]
@@ -191,7 +196,6 @@ if data_loaded_successfully:
                     
                     df_resultados = pd.DataFrame(resultados).set_index("Etiqueta")
                     
-                    # Usar st.table para una tabla estática y no desplazable.
                     st.table(df_resultados.style.format(
                         formatter={"Diferencia": format_difference}
                     ).apply(
