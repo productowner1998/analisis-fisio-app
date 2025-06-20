@@ -28,6 +28,19 @@ def style_difference(val):
         pass # Se mantiene el color por defecto para 'N/A' o 'Error'
     return f'color: {color}'
 
+# --- FUNCIÓN PARA FORMATEAR LA DIFERENCIA ---
+def format_difference(val):
+    """
+    Formatea la diferencia para mostrarla como un entero, manejando N/A.
+    """
+    if val == "N/A" or val == "Error":
+        return val
+    try:
+        # Formatea como entero sin decimales
+        return f"{int(val):d}"
+    except (ValueError, TypeError):
+        return '' # Devuelve vacío si no se puede convertir (no debería pasar)
+
 # --- CONEXIÓN A GOOGLE SHEETS Y CARGA DE DATOS ---
 try:
     credentials_dict = st.secrets["gcp_service_account"]
@@ -143,8 +156,11 @@ if data_loaded_successfully:
                     
                     df_resultados = pd.DataFrame(resultados).set_index("Etiqueta")
                     
-                    # Se elimina el formateador problemático y se confía en el estilo y el tipo de datos.
-                    st.dataframe(df_resultados.style.apply(
+                    # *** LÍNEA CORREGIDA ***
+                    # Se usa un formateador personalizado para asegurar que el 0 se muestre.
+                    st.dataframe(df_resultados.style.format(
+                        formatter={"Diferencia (Evolutiva - Comparativa)": format_difference}
+                    ).apply(
                         lambda x: x.map(style_difference), subset=['Diferencia (Evolutiva - Comparativa)']
                     ))
     else:
