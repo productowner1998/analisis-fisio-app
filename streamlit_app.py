@@ -98,48 +98,49 @@ if data_loaded_successfully:
             fecha_evolutiva = st.selectbox("Fecha Evolutiva (reciente)", options=available_periods, index=None, placeholder="Elige una fecha")
         
         # --- 3. ANÁLISIS ---
-        if fecha_comparativa and fecha_evolutiva:
-            st.header("3. Ejecutar Análisis")
-            if st.button("Analizar Progreso"):
-                if fecha_comparativa == fecha_evolutiva:
-                    st.warning("Por favor, selecciona dos fechas diferentes para la comparación.")
-                else:
-                    record_comp = patient_records[patient_records['Periodo'] == fecha_comparativa].iloc[0]
-                    record_evol = patient_records[patient_records['Periodo'] == fecha_evolutiva].iloc[0]
+        st.header("3. Ejecutar Análisis")
 
-                    st.subheader("Resultados del Análisis")
-                    
-                    def extract_url_from_hyperlink(formula):
-                        match = re.search(r'HYPERLINK\("([^"]+)"', formula)
-                        return match.group(1) if match else "#"
-                    
-                    url_comp = extract_url_from_hyperlink(record_comp['Nombre Paciente'])
-                    url_evol = extract_url_from_hyperlink(record_evol['Nombre Paciente'])
+        # El botón está deshabilitado si no se han seleccionado ambas fechas
+        if st.button("Analizar Progreso", disabled=not (fecha_comparativa and fecha_evolutiva)):
+            if fecha_comparativa == fecha_evolutiva:
+                st.warning("Por favor, selecciona dos fechas diferentes para la comparación.")
+            else:
+                record_comp = patient_records[patient_records['Periodo'] == fecha_comparativa].iloc[0]
+                record_evol = patient_records[patient_records['Periodo'] == fecha_evolutiva].iloc[0]
 
-                    st.write(f"Comparando la valoración de **{fecha_comparativa}** ([ver PDF]({url_comp})) con la de **{fecha_evolutiva}** ([ver PDF]({url_evol})).")
-                    
-                    resultados = []
-                    columnas_analisis = [col for col in df.columns if col not in ['Nombre Archivo', 'Nombre Paciente', 'Identificación', 'Periodo', 'Nombre Limpio']]
+                st.subheader("Resultados del Análisis")
+                
+                def extract_url_from_hyperlink(formula):
+                    match = re.search(r'HYPERLINK\("([^"]+)"', formula)
+                    return match.group(1) if match else "#"
+                
+                url_comp = extract_url_from_hyperlink(record_comp['Nombre Paciente'])
+                url_evol = extract_url_from_hyperlink(record_evol['Nombre Paciente'])
 
-                    for col in columnas_analisis:
-                        val_comp = record_comp[col]
-                        val_evol = record_evol[col]
-                        
-                        diferencia = "N/A"
-                        if val_comp != "N/A" and val_evol != "N/A":
-                            try:
-                                diferencia = float(val_evol) - float(val_comp)
-                            except (ValueError, TypeError):
-                                diferencia = "Error"
-                        
-                        resultados.append({
-                            "Etiqueta": col,
-                            f"Valor ({fecha_comparativa})": val_comp,
-                            f"Valor ({fecha_evolutiva})": val_evol,
-                            "Diferencia (Evolutiva - Comparativa)": diferencia
-                        })
+                st.write(f"Comparando la valoración de **{fecha_comparativa}** ([ver PDF]({url_comp})) con la de **{fecha_evolutiva}** ([ver PDF]({url_evol})).")
+                
+                resultados = []
+                columnas_analisis = [col for col in df.columns if col not in ['Nombre Archivo', 'Nombre Paciente', 'Identificación', 'Periodo', 'Nombre Limpio']]
+
+                for col in columnas_analisis:
+                    val_comp = record_comp[col]
+                    val_evol = record_evol[col]
                     
-                    df_resultados = pd.DataFrame(resultados)
-                    st.dataframe(df_resultados)
+                    diferencia = "N/A"
+                    if val_comp != "N/A" and val_evol != "N/A":
+                        try:
+                            diferencia = float(val_evol) - float(val_comp)
+                        except (ValueError, TypeError):
+                            diferencia = "Error"
+                    
+                    resultados.append({
+                        "Etiqueta": col,
+                        f"Valor ({fecha_comparativa})": val_comp,
+                        f"Valor ({fecha_evolutiva})": val_evol,
+                        "Diferencia (Evolutiva - Comparativa)": diferencia
+                    })
+                
+                df_resultados = pd.DataFrame(resultados)
+                st.dataframe(df_resultados)
 else:
     st.info("La aplicación no puede cargar los datos. Por favor, contacta al administrador.")
